@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SafeRoute NCR</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--asphalt:#1d252c;--paper:#f2f4f3;--amber:#f2b01e;--safe:#1f9d6b;--alert:#d4443b;--blue:#2f6fdd;--line:#d5dad8;--mute:#5d6a70}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{font:15px/1.45 "IBM Plex Sans",system-ui,sans-serif;color:var(--asphalt);background:var(--paper);display:grid;grid-template-columns:380px 1fr}
+aside{overflow-y:auto;padding:16px;border-right:1px solid var(--line);background:#fff}
+h1{font-size:21px;margin:0 0 2px;font-weight:600}.sub{color:var(--mute);margin:0 0 14px;font-size:13px}
+h2{font-size:14px;margin:18px 0 6px;font-weight:600}
+label{display:block;font-size:13px;color:var(--mute);margin:8px 0 3px}
+input[type=text],select{width:100%;padding:8px 9px;border:1px solid var(--line);border-radius:6px;font:inherit;background:#fff;color:inherit}
+input[type=range]{width:100%;accent-color:var(--asphalt)}
+.row{display:flex;gap:6px}.row>*{flex:1}
+button{font:inherit;cursor:pointer;border:1px solid var(--asphalt);background:#fff;color:var(--asphalt);border-radius:6px;padding:7px 10px}
+button.main{background:var(--asphalt);color:#fff;width:100%;margin-top:12px;padding:10px;font-weight:600}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--amber);outline-offset:1px}
+.chk{display:flex;gap:8px;align-items:center;margin:4px 0}
+.note{padding:9px 11px;border-radius:6px;font-size:13px;margin-top:8px}
+.ok{background:#1f9d6b1c;color:#0f6a47}.bad{background:#d4443b1c;color:#9c2820}.info{background:#f2b01e26;color:#6b4d00}
+.route{border-left:5px solid;padding:7px 10px;margin:8px 0;background:var(--paper);border-radius:0 6px 6px 0}
+.route b{display:block}.meta{font-size:12.5px;color:var(--mute)}
+ul.cp{margin:6px 0 0;padding-left:18px;font-size:13px}
+.hot{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px}
+.pill{font-weight:600}
+#map{height:100%;min-height:360px}
+.leaflet-popup-content{font:13px/1.4 "IBM Plex Sans",sans-serif}
+[hidden]{display:none!important}
+#chatBtn{position:fixed;right:18px;bottom:18px;z-index:1200;background:var(--asphalt);color:#fff;border:0;border-radius:24px;padding:11px 18px;font-weight:600;box-shadow:0 4px 14px #0004}
+#chat{position:fixed;right:18px;bottom:70px;z-index:1200;width:370px;max-width:calc(100vw - 36px);height:500px;max-height:72vh;background:#fff;border:1px solid var(--line);border-radius:10px;display:flex;flex-direction:column;box-shadow:0 8px 28px #0004}
+.ch-h{display:flex;justify-content:space-between;align-items:center;padding:9px 11px;border-bottom:1px solid var(--line)}
+.ch-h button{padding:3px 8px;margin-left:4px}
+#cset{padding:4px 11px 10px;border-bottom:1px solid var(--line)}
+#msgs{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:7px}
+.m{padding:7px 10px;border-radius:8px;max-width:90%;white-space:pre-wrap;font-size:14px}.m.u{align-self:flex-end;background:var(--asphalt);color:#fff}.m.a{background:var(--paper)}
+.chips{display:flex;gap:5px;flex-wrap:wrap;padding:0 10px 6px}.chips button{font-size:12px;padding:3px 8px;border-radius:14px;border-color:var(--line)}
+.ch-f{display:flex;gap:6px;padding:9px;border-top:1px solid var(--line)}.ch-f input{flex:1}
+@media(max-width:820px){body{grid-template-columns:1fr;grid-template-rows:55vh auto;height:auto}#map{order:-1;height:55vh}aside{border-right:0}html,body{height:auto}}
+</style></head><body>
+<aside>
+ <h1>SafeRoute NCR</h1>
+ <p class="sub">Where traffic fines are most likely in Delhi NCR, and a route that crosses fewer of those spots.</p>
+
+ <h2>What do you have with you?</h2>
+ <div class="chk"><input type="checkbox" id="c1" checked><label for="c1" style="margin:0;color:inherit">Valid driving licence</label></div>
+ <div class="chk"><input type="checkbox" id="c2" checked><label for="c2" id="c2t" style="margin:0;color:inherit">Helmet for rider and pillion</label></div>
+ <div class="chk"><input type="checkbox" id="c3" checked><label for="c3" style="margin:0;color:inherit">RC, insurance and PUC valid</label></div>
+ <select id="veh" aria-label="Vehicle"><option>Two-wheeler</option><option>Car</option></select>
+ <div id="cmp" class="meta" style="margin-top:6px"></div>
+
+ <h2>Trip</h2>
+ <label for="from">From</label>
+ <div class="row"><input type="text" id="from" placeholder="e.g. Dwarka Sector 10"><button id="pf" style="flex:0 0 auto">Pick on map</button></div>
+ <label for="to">To</label>
+ <div class="row"><input type="text" id="to" placeholder="e.g. Noida Sector 62"><button id="pt" style="flex:0 0 auto">Pick on map</button></div>
+ <label for="day">Day</label>
+ <select id="day"><option value="0">Monday</option><option value="1">Tuesday</option><option value="2">Wednesday</option><option value="3">Thursday</option><option value="4">Friday</option><option value="5">Saturday</option><option value="6">Sunday</option></select>
+ <label for="hour">Departure time: <b id="hv"></b></label>
+ <input type="range" id="hour" min="0" max="23">
+ <label for="extra">Longest extra drive I accept: <b id="ev"></b></label>
+ <input type="range" id="extra" min="0" max="45" step="5" value="15">
+ <button class="main" id="go">Find safer route</button>
+ <div id="out"></div>
+
+ <h2>Highest-risk checkpoints at this time</h2>
+ <div id="hot"></div>
+ <p class="meta" style="margin-top:14px" id="mdl"></p>
+</aside>
+<div id="map" role="application" aria-label="Map"></div>
+
+<button id="chatBtn">Ask AI</button>
+<div id="chat" hidden>
+ <div class="ch-h"><b>Route assistant</b><span><button id="cfg">AI settings</button><button id="cx" aria-label="Close">×</button></span></div>
+ <div id="cset" hidden>
+  <label for="key">Gemini API key (free at aistudio.google.com). Leave empty for the built-in assistant.</label><input type="password" id="key" autocomplete="off">
+  <label for="model">Model name</label><input type="text" id="model" value="gemini-2.5-flash">
+  <button id="ksave" style="margin-top:8px">Save</button>
+  <p class="meta">The key is stored only in this browser.</p>
+ </div>
+ <div id="msgs"></div>
+ <div class="chips"><button>Riskiest spots now</button><button>Best time to travel</button><button>Explain my route</button><button>Typical fines</button></div>
+ <div class="ch-f"><input type="text" id="q" placeholder="Ask about routes, fines, timing…" aria-label="Message"><button id="send">Send</button></div>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="data.js"></script>
+<script>
+const D=window.NCR,CP=D.checkpoints,$=id=>document.getElementById(id);
+const VL={helmet:"No helmet",no_licence:"No licence",drunk_driving:"Drunk driving",speeding:"Speeding",signal_jumping:"Signal jumping",wrong_parking:"Wrong parking",no_documents:"Missing documents"};
+const band=h=>h>=22||h<=5?"night":h<=11?"morning":h<=16?"midday":"evening";
+const DAYN=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+const exposed=()=>{const e=[];if(!$("c1").checked)e.push("no_licence");if(!$("c2").checked&&$("veh").value!="Car")e.push("helmet");if(!$("c3").checked)e.push("no_documents");return e};
+function mult(c,h){const m=c.mix[band(h)],a=exposed().reduce((s,v)=>s+m[D.viol.indexOf(v)],0);return .6+1.2*a}
+const risk=(c,d,h)=>Math.min(100,c.fines[d][h]/D.p99*100*mult(c,h));
+const colour=r=>`hsl(${Math.round(135-r*1.35)},70%,42%)`;
+const now=new Date();$("day").value=(now.getDay()+6)%7;$("hour").value=now.getHours();
+const day=()=>+$("day").value,hour=()=>+$("hour").value;
+
+// ---------- map
+const map=L.map("map").setView([28.6,77.2],10);
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:18,attribution:"&copy; OpenStreetMap contributors"}).addTo(map);
+const cpLayer=L.layerGroup().addTo(map),routeLayer=L.layerGroup().addTo(map),pins={};
+function drawCheckpoints(){
+  cpLayer.clearLayers();const d=day(),h=hour();
+  CP.forEach(c=>{const r=risk(c,d,h);
+    L.circleMarker([c.lat,c.lon],{radius:7+r/9,color:"#fff",weight:2,fillColor:colour(r),fillOpacity:.9})
+     .bindPopup(`<b>${c.name}</b><br>Your risk ${Math.round(r)}/100 · about ${c.fines[d][h].toFixed(1)} fines per hour<br>Most likely fine now: <b>${VL[c.top[band(h)]]}</b><br>Average fine ₹${c.avgFine.toLocaleString("en-IN")}<br>Police presence ${Math.round(c.police*100)}% · cameras ${Math.round(c.camera*100)}%`)
+     .addTo(cpLayer)});
+  $("hv").textContent=String(h).padStart(2,"0")+":00";
+  const top=CP.map(c=>[c,risk(c,d,h)]).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  $("hot").innerHTML=top.map(([c,r])=>`<div class="hot" data-i="${CP.indexOf(c)}"><span>${c.name}<br><span class="meta">${VL[c.top[band(h)]]}</span></span><span class="pill" style="color:${colour(r)}">${Math.round(r)}</span></div>`).join("");
+  document.querySelectorAll(".hot").forEach(e=>e.onclick=()=>{const c=CP[e.dataset.i];map.flyTo([c.lat,c.lon],14)});
+}
+$("mdl").textContent=`Model: ${D.model} · held-out R² ${D.r2.toFixed(2)} · MAE ${D.mae.toFixed(1)} fines/hour. Trained on synthetic data, so use it as a demo, not as official enforcement data.`;
+
+// ---------- compliance
+function compliance(){
+  $("c2t").textContent=$("veh").value=="Car"?"Seatbelts worn by all occupants":"Helmet for rider and pillion";
+  const e=exposed();
+  $("cmp").textContent=e.length?"Prototype mode: the map and routes are re-weighted for the fines you could get ("+e.map(v=>v.replace("_"," ")).join(", ")+"). In real life, ride with a helmet and licence.":"Fully compliant: only speeding, signals, parking and similar fines apply to you.";
+}
+
+// ---------- points: typed place or picked on the map
+const pt={from:null,to:null};let picking=null;
+const flag=(k)=>{if(pins[k])map.removeLayer(pins[k]);pins[k]=L.marker(pt[k],{title:k}).addTo(map).bindTooltip(k=="from"?"Start":"Destination",{permanent:true,direction:"top"})};
+function pick(k){picking=k;map.getContainer().style.cursor="crosshair";$("out").innerHTML=`<div class="note info">Click the map to set the ${k=="from"?"start":"destination"}.</div>`}
+$("pf").onclick=()=>pick("from");$("pt").onclick=()=>pick("to");
+map.on("click",e=>{if(!picking)return;pt[picking]=[e.latlng.lat,e.latlng.lng];$(picking).value=e.latlng.lat.toFixed(4)+", "+e.latlng.lng.toFixed(4);flag(picking);picking=null;map.getContainer().style.cursor="";$("out").innerHTML=""});
+async function geocode(k){
+  const q=$(k).value.trim();if(!q)throw new Error("Enter both places.");
+  const m=q.match(/^(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)$/);if(m){pt[k]=[+m[1],+m[2]];flag(k);return}
+  const r=await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=in&viewbox=76.8,29.0,77.7,28.2&bounded=1&q="+encodeURIComponent(q));
+  const j=await r.json();if(!j.length)throw new Error(`Could not find "${q}" in Delhi NCR. Try a nearby landmark or use Pick on map.`);
+  pt[k]=[+j[0].lat,+j[0].lon];flag(k);
+}
+
+// ---------- routing (OSRM demo server) + risk scoring
+const M=(a,b)=>{const x=(b[1]-a[1])*Math.cos((a[0]+b[0])*Math.PI/360)*111320,y=(b[0]-a[0])*111320;return Math.hypot(x,y)};
+async function osrm(pts,alts){
+  const u=`https://router.project-osrm.org/route/v1/driving/${pts.map(p=>p[1]+","+p[0]).join(";")}?overview=full&geometries=geojson&alternatives=${alts}`;
+  const r=await fetch(u);if(!r.ok)throw new Error("Routing service is busy. Wait a few seconds and try again.");
+  const j=await r.json();if(j.code!=="Ok")throw new Error("No drivable route found between these points.");
+  return j.routes.map(x=>({pts:x.geometry.coordinates.map(c=>[c[1],c[0]]),min:x.duration/60,km:x.distance/1000}));
+}
+function score(rt){
+  const d=day(),h=hour(),hit=[];
+  CP.forEach(c=>{let best=1e9;for(const p of rt.pts){const m=M(p,[c.lat,c.lon]);if(m<best)best=m;if(best<350)break}
+    if(best<350)hit.push({c,r:risk(c,d,h)})});
+  rt.hit=hit.sort((a,b)=>b.r-a.r);rt.exposure=hit.reduce((s,x)=>s+x.r,0);return rt;
+}
+function sidePoint(rt,c,side,km){
+  let bi=0,bm=1e9;rt.pts.forEach((p,i)=>{const m=M(p,[c.lat,c.lon]);if(m<bm){bm=m;bi=i}});
+  const a=rt.pts[Math.max(bi-6,0)],b=rt.pts[Math.min(bi+6,rt.pts.length-1)];
+  const br=Math.atan2((b[1]-a[1])*Math.cos(a[0]*Math.PI/180),b[0]-a[0])+side*Math.PI/2;
+  return [c.lat+km*Math.cos(br)/111.32,c.lon+km*Math.sin(br)/(111.32*Math.cos(c.lat*Math.PI/180))];
+}
+const sig=r=>Math.round(r.km*10)+"-"+Math.round(r.min);
+async function plan(){
+  const base=(await osrm([pt.from,pt.to],3)).map(score),cand=[...base];
+  const fastest=[...base].sort((a,b)=>a.min-b.min)[0];
+  const hot=fastest.hit.filter(x=>x.r>=45).slice(0,2);
+  for(const x of hot)for(const s of [1,-1]){
+    try{const via=sidePoint(fastest,x.c,s,1.6);const r=(await osrm([pt.from,via,pt.to],"false"))[0];
+      if(r&&!cand.some(c=>sig(c)==sig(r)))cand.push(score(r))}catch(e){}
+  }
+  return cand;
+}
+function pickRoutes(c){
+  const f=[...c].sort((a,b)=>a.min-b.min)[0],lim=f.min+ +$("extra").value;
+  const ok=c.filter(r=>r.min<=lim).sort((a,b)=>a.exposure-b.exposure||a.min-b.min);
+  return{fast:f,safe:ok[0],all:c.filter(r=>r.min<=lim)};
+}
+const names=r=>r.hit.length?"<ul class='cp'>"+r.hit.slice(0,6).map(x=>`<li>${x.c.name} <span class="pill" style="color:${colour(x.r)}">${Math.round(x.r)}</span> · ${VL[x.c.top[band(hour())]]}</li>`).join("")+"</ul>":"<div class='meta'>No known checkpoints near this route.</div>";
+function show(res){
+  lastRes=res;routeLayer.clearLayers();const{fast,safe,all}=res,same=fast===safe;
+  all.forEach(r=>{if(r!==fast&&r!==safe)L.polyline(r.pts,{color:"#8a959a",weight:4,opacity:.6}).addTo(routeLayer)});
+  L.polyline(fast.pts,{color:"#2f6fdd",weight:same?7:5,dashArray:same?null:"9 8",opacity:.9}).addTo(routeLayer);
+  if(!same)L.polyline(safe.pts,{color:"#1f9d6b",weight:7,opacity:.95}).addTo(routeLayer);
+  map.fitBounds(L.polyline(fast.pts.concat(safe.pts)).getBounds(),{padding:[40,40]});
+  const cut=fast.exposure?Math.round((1-safe.exposure/fast.exposure)*100):0;
+  const card=(t,col,r)=>`<div class="route" style="border-color:${col}"><b>${t}</b><div class="meta">${r.km.toFixed(1)} km · about ${Math.round(r.min)} min · fine-risk exposure ${Math.round(r.exposure)}</div>${names(r)}</div>`;
+  const hi=fast.hit[0];
+  $("out").innerHTML=(same?card("Fastest route is also the lowest-risk option","#1f9d6b",fast)+`<div class="note info">No detour within your ${$("extra").value}-minute limit passes fewer checkpoints at this time. Try a longer limit or another hour.</div>`
+   :card("Fastest","#2f6fdd",fast)+card("Lower-risk route","#1f9d6b",safe)+`<div class="note ok">The lower-risk route passes about ${cut}% less checkpoint exposure and adds ${Math.max(0,Math.round(safe.min-fast.min))} minutes.</div>`)
+   +(hi?`<p class="meta">At ${String(hour()).padStart(2,"0")}:00 the most checked spot on the fastest route is ${hi.c.name}, mostly for: ${VL[hi.c.top[band(hour())]].toLowerCase()}. Average fine there is ₹${hi.c.avgFine.toLocaleString("en-IN")}. Keep your licence, documents and safety gear ready, and stay within the speed limit.</p>`:"");
+}
+$("go").onclick=async()=>{
+  $("out").innerHTML='<div class="note info">Finding routes…</div>';
+  try{await geocode("from");await geocode("to");show(pickRoutes(await plan()))}
+  catch(e){$("out").innerHTML=`<div class="note bad">${e.message}</div>`}
+};
+$("hour").oninput=$("day").onchange=drawCheckpoints;
+$("extra").oninput=()=>{$("ev").textContent="+"+$("extra").value+" min"};
+["c1","c2","c3","veh"].forEach(i=>$(i).onchange=()=>{compliance();drawCheckpoints()});
+$("ev").textContent="+15 min";compliance();drawCheckpoints();
+
+// ---------- assistant: built-in answers, or Gemini when a key is saved
+const hist=[];let lastRes=null;
+const fmtH=x=>String(x).padStart(2,"0")+":00";
+function say(t,who){const d=document.createElement("div");d.className="m "+who;d.textContent=t;$("msgs").appendChild(d);$("msgs").scrollTop=1e9;return d}
+const prof=()=>exposed().length?exposed().map(v=>v.replace("_"," ")).join(", "):"fully compliant";
+function context(){
+  const d=day(),h=hour(),top=CP.map(c=>[c,risk(c,d,h)]).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  let s=`Time: ${DAYN[d]} ${fmtH(h)}. Vehicle: ${$("veh").value}. User lacks: ${prof()}.\nTop checkpoints now (risk 0-100 for this user, most likely fine): `+top.map(([c,r])=>`${c.name} ${Math.round(r)} (${VL[c.top[band(h)]]}, avg Rs ${c.avgFine})`).join("; ")+".";
+  if(lastRes){const f=lastRes.fast,v=lastRes.safe;s+=`\nLast route: fastest ${f.km.toFixed(1)} km, ${Math.round(f.min)} min, exposure ${Math.round(f.exposure)}, passes ${f.hit.map(x=>x.c.name).join(", ")||"none"}. Lower-risk: ${v.km.toFixed(1)} km, ${Math.round(v.min)} min, exposure ${Math.round(v.exposure)}, passes ${v.hit.map(x=>x.c.name).join(", ")||"none"}.`}
+  return s}
+function local(q){
+  q=q.toLowerCase();const d=day(),h=hour(),top=CP.map(c=>[c,risk(c,d,h)]).sort((a,b)=>b[1]-a[1]);
+  if(/best time|safest time|when|what time/.test(q)){
+    const cps=lastRes?lastRes.fast.hit.map(x=>x.c):CP;if(!cps.length)return "Your fastest route passes no known checkpoints, so any time works.";
+    const hr=[...Array(24).keys()].map(x=>[x,cps.reduce((s,c)=>s+risk(c,d,x),0)/cps.length]).sort((a,b)=>a[1]-b[1]);
+    return `${lastRes?"For your route":"Across all checkpoints"} on ${DAYN[d]}, the calmest hours are ${hr.slice(0,3).map(x=>fmtH(x[0])).join(", ")}. The busiest is ${fmtH(hr[23][0])}.`}
+  if(/route|why|explain|result|compare/.test(q)){
+    if(!lastRes)return "Plan a trip first (From, To, then Find safer route) and I will explain the result.";
+    const f=lastRes.fast,v=lastRes.safe;if(f===v)return `Your fastest route (${f.km.toFixed(1)} km, ${Math.round(f.min)} min) is also the lowest-risk option within your extra-time limit. Exposure score ${Math.round(f.exposure)}.`;
+    return `The fastest route takes ${Math.round(f.min)} min and passes ${f.hit.length} checkpoint(s) with exposure ${Math.round(f.exposure)}. The lower-risk route takes ${Math.round(v.min)} min, passes ${v.hit.length}, with exposure ${Math.round(v.exposure)}. Worst spot avoided: ${f.hit.find(x=>!v.hit.some(y=>y.c===x.c))?.c.name||"none, it just skirts the busy ones"}.`}
+  if(/fine|amount|cost|pay|rupee|challan/.test(q))return "Typical challans in this dataset: no helmet ₹1,000, no licence ₹5,000, drunk driving ₹10,000, speeding ₹1,000 to 2,000, signal jumping ₹5,000, wrong parking ₹500 to 1,000, missing documents ₹500.";
+  if(/tip|avoid|helmet|licen|document|advice|help/.test(q)){
+    const agg=D.viol.map((v,i)=>[v,CP.reduce((s,c)=>s+c.fines[d][h]*c.mix[band(h)][i],0)]).sort((a,b)=>b[1]-a[1]);
+    return `Most common fines right now: ${agg.slice(0,3).map(x=>VL[x[0]].toLowerCase()).join(", ")}. Your profile (${prof()}) makes ${exposed().length?exposed().map(v=>VL[v].toLowerCase()).join(" and "):"speeding and signals"} the ones to watch.`}
+  if(/hotspot|risky|dangerous|most|where|spot/.test(q))return `Highest fine risk for you on ${DAYN[d]} at ${fmtH(h)}:\n`+top.slice(0,5).map(([c,r])=>`• ${c.name}: ${Math.round(r)}/100, mostly ${VL[c.top[band(h)]].toLowerCase()}`).join("\n");
+  return "I can tell you the riskiest spots now, the best time to travel, why a route was chosen, typical fines and what to watch for. Add a free Gemini key in AI settings for open-ended questions.";
+}
+async function llm(q){
+  const key=localStorage.getItem("gk"),model=localStorage.getItem("gm")||"gemini-2.5-flash";
+  const sys="You are SafeRoute, a playful, concise assistant inside a class-project web app that predicts traffic-fine risk in Delhi NCR from a synthetic dataset. Answer in 2 to 5 short sentences using ONLY the data below. If the data does not cover something, say so. Do not invent places or numbers.\n\n"+context();
+  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({systemInstruction:{parts:[{text:sys}]},contents:hist.slice(-8).concat([{role:"user",parts:[{text:q}]}])})});
+  const j=await r.json();if(!r.ok)throw new Error(j.error?.message||"AI request failed");
+  return (j.candidates?.[0]?.content?.parts||[]).map(p=>p.text).join("")||"No answer returned.";
+}
+async function ask(text){
+  const q=(text||$("q").value).trim();if(!q)return;$("q").value="";say(q,"u");const w=say("…","a");let a;
+  if(localStorage.getItem("gk")){try{a=await llm(q)}catch(e){a=local(q)+"\n\n(AI unavailable: "+e.message+")"}}else a=local(q);
+  w.textContent=a;hist.push({role:"user",parts:[{text:q}]},{role:"model",parts:[{text:a}]});
+}
+$("chatBtn").onclick=()=>{$("chat").hidden=!$("chat").hidden;if(!$("msgs").children.length)say("Hi! I am the SafeRoute assistant. Ask me where fines are likely, when to travel, or why a route was picked.","a")};
+$("cx").onclick=()=>$("chat").hidden=true;$("cfg").onclick=()=>$("cset").hidden=!$("cset").hidden;
+$("ksave").onclick=()=>{localStorage.setItem("gk",$("key").value.trim());localStorage.setItem("gm",$("model").value.trim()||"gemini-2.5-flash");$("cset").hidden=true;say($("key").value.trim()?"Gemini connected. Ask me anything about the data.":"Using the built-in assistant.","a")};
+$("model").value=localStorage.getItem("gm")||"gemini-2.5-flash";$("key").value=localStorage.getItem("gk")||"";
+$("send").onclick=()=>ask();$("q").onkeydown=e=>{if(e.key==="Enter")ask()};
+document.querySelectorAll(".chips button").forEach(b=>b.onclick=()=>ask(b.textContent));
+</script></body></html>
