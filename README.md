@@ -141,7 +141,7 @@ The website is static, so it can be hosted free:
 - **Netlify:** log in at <https://app.netlify.com/drop> and drag the `website` folder onto the page. To update, drag the folder onto the site's Deploys tab again.
 - **GitHub Pages:** push `website` to a repository, then enable Pages under Settings.
 
-**Live link:** _add your link here_ (for example `https://saferoute-ncr.netlify.app`)
+**Live link:**(https://saferoute-ncr-website.vercel.app/)
 
 ## 10. Technology stack
 
